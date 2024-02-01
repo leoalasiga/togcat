@@ -3,6 +3,8 @@ package com.als.togcat.connector;
 import com.als.togcat.engine.HttpServletRequestImpl;
 import com.als.togcat.engine.HttpServletResponseImpl;
 import com.als.togcat.engine.ServletContextImpl;
+import com.als.togcat.engine.filter.HelloFilter;
+import com.als.togcat.engine.filter.LogFilter;
 import com.als.togcat.engine.servlet.HelloServlet;
 import com.als.togcat.engine.servlet.IndexServlet;
 import com.sun.net.httpserver.HttpExchange;
@@ -30,15 +32,19 @@ import java.time.Duration;
 public class HttpConnector implements HttpHandler,AutoCloseable {
     final Logger logger = LoggerFactory.getLogger(getClass());
 
+
     /**
-     * =================version2
+     * =================version3
      */
     final ServletContextImpl servletContext;
     final HttpServer httpServer;
-//    final Duration stopDelay = Duration.ofSeconds(5);
+    //    final Duration stopDelay = Duration.ofSeconds(5);
     public HttpConnector() throws IOException {
         this.servletContext = new ServletContextImpl();
-        this.servletContext.initialize(List.of(IndexServlet.class, HelloServlet.class));
+        this.servletContext.initServlets(List.of(IndexServlet.class, HelloServlet.class));
+        this.servletContext.initFilters(List.of(LogFilter.class, HelloFilter.class));
+
+
         // start http server:
         String host = "0.0.0.0";
         int port = 8080;
@@ -67,6 +73,46 @@ public class HttpConnector implements HttpHandler,AutoCloseable {
             logger.error(e.getMessage(), e);
         }
     }
+
+    /**
+     * =================version2
+     */
+//    final ServletContextImpl servletContext;
+//    final HttpServer httpServer;
+////    final Duration stopDelay = Duration.ofSeconds(5);
+//    public HttpConnector() throws IOException {
+//        this.servletContext = new ServletContextImpl();
+//        this.servletContext.initialize(List.of(IndexServlet.class, HelloServlet.class));
+//
+//
+//        // start http server:
+//        String host = "0.0.0.0";
+//        int port = 8080;
+//        this.httpServer = HttpServer.create(new InetSocketAddress(host, port), 0);
+//        this.httpServer.createContext("/", this);
+//        this.httpServer.start();
+//        logger.info("togcat http server started at {}:{}...", host, port);
+//    }
+//
+//
+//    @Override
+//    public void close() {
+////        BigDecimal bigDecimal = this.stopDelay.toSeconds();
+//        this.httpServer.stop(5 );
+//    }
+//
+//    @Override
+//    public void handle(HttpExchange exchange) throws IOException {
+//        HttpExchangeAdapter httpExchangeAdapter = new HttpExchangeAdapter(exchange);
+//        HttpServletRequest request = new HttpServletRequestImpl(httpExchangeAdapter);
+//        HttpServletResponse response = new HttpServletResponseImpl(httpExchangeAdapter);
+//        // process:
+//        try {
+//            this.servletContext.process(request, response);
+//        } catch (Exception e) {
+//            logger.error(e.getMessage(), e);
+//        }
+//    }
 
 
 
