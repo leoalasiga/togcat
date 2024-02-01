@@ -80,7 +80,7 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public String getMethod() {
-        return null;
+        return httpExchangeRequest.getRequestMethod();
     }
 
     @Override
@@ -125,7 +125,7 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public String getRequestURI() {
-        return null;
+        return this.httpExchangeRequest.getRequestURI().getPath();
     }
 
     @Override
