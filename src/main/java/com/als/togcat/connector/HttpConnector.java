@@ -7,6 +7,8 @@ import com.als.togcat.engine.filter.HelloFilter;
 import com.als.togcat.engine.filter.LogFilter;
 import com.als.togcat.engine.servlet.HelloServlet;
 import com.als.togcat.engine.servlet.IndexServlet;
+import com.als.togcat.engine.servlet.LoginServlet;
+import com.als.togcat.engine.servlet.LogoutServlet;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -41,7 +43,7 @@ public class HttpConnector implements HttpHandler,AutoCloseable {
     //    final Duration stopDelay = Duration.ofSeconds(5);
     public HttpConnector() throws IOException {
         this.servletContext = new ServletContextImpl();
-        this.servletContext.initServlets(List.of(IndexServlet.class, HelloServlet.class));
+        this.servletContext.initServlets(List.of(IndexServlet.class, LoginServlet.class, LogoutServlet.class, HelloServlet.class));
         this.servletContext.initFilters(List.of(LogFilter.class, HelloFilter.class));
 
 
@@ -64,8 +66,8 @@ public class HttpConnector implements HttpHandler,AutoCloseable {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         HttpExchangeAdapter httpExchangeAdapter = new HttpExchangeAdapter(exchange);
-        HttpServletRequest request = new HttpServletRequestImpl(httpExchangeAdapter);
         HttpServletResponse response = new HttpServletResponseImpl(httpExchangeAdapter);
+        HttpServletRequest request = new HttpServletRequestImpl(this.servletContext,httpExchangeAdapter,response);
         // process:
         try {
             this.servletContext.process(request, response);

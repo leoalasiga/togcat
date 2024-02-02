@@ -55,7 +55,7 @@ public class HttpExchangeAdapter implements HttpExchangeRequest, HttpExchangeRes
 
     @Override
     public Headers getRequestHeaders() {
-        return this.httpExchange.getResponseHeaders();
+        return this.httpExchange.getRequestHeaders();
 
     }
 

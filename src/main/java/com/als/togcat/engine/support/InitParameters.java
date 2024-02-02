@@ -14,6 +14,11 @@ import java.util.Set;
  * @date 2024/2/1 上午10:53
  */
 public class InitParameters extends LazyMap<String> {
+
+
+    public InitParameters() {
+        super(false);
+    }
     /**
      * Sets the initialization parameter with the given name and value on the
      * Servlet or Filter that is represented by this Registration.

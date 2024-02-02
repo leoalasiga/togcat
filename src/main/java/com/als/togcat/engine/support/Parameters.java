@@ -36,7 +36,7 @@ public class Parameters {
     }
 
 
-    public String getParameter(String name) throws UnsupportedEncodingException {
+    public String getParameter(String name)  {
         String[] values = getParameterValues(name);
         if (values == null) {
             return null;
@@ -44,22 +44,22 @@ public class Parameters {
         return values[0];
     }
 
-    public Enumeration<String> getParameterNames() throws UnsupportedEncodingException {
+    public Enumeration<String> getParameterNames()  {
         return Collections.enumeration(getParameterMap().keySet());
     }
 
-    public String[] getParameterValues(String name) throws UnsupportedEncodingException {
+    public String[] getParameterValues(String name)  {
         return getParameterMap().get(name);
     }
 
-    public Map<String, String[]> getParameterMap() throws UnsupportedEncodingException {
+    public Map<String, String[]> getParameterMap()  {
         if (this.parameters == null) {
             this.parameters = initParameters();
         }
         return this.parameters;
     }
 
-    Map<String, String[]> initParameters() throws UnsupportedEncodingException {
+    Map<String, String[]> initParameters()  {
         Map<String, List<String>> params = new HashMap<>();
         String query = this.exchangeRequest.getRequestURI().getRawQuery();
         if (query != null) {

@@ -48,9 +48,9 @@ import java.util.Set;
  */
 public class ServletContextImpl implements ServletContext {
     final Logger logger = LoggerFactory.getLogger(getClass());
+    final SessionManager sessionManager = new SessionManager(this, 600);
     private Map<String, ServletRegistrationImpl> servletRegistrations = new HashMap<>();
     private Map<String, FilterRegistrationImpl> filterRegistrations = new HashMap<>();
-
     final Map<String, Servlet> nameToServlet = new HashMap<>();
     final Map<String, Filter> nameToFilters = new HashMap<>();
     final List<ServletMapping> servletMappings = new ArrayList<>();
@@ -526,7 +526,7 @@ public class ServletContextImpl implements ServletContext {
 
     @Override
     public int getSessionTimeout() {
-        return 0;
+        return this.sessionManager.inactiveInterval;
     }
 
     @Override

@@ -1,6 +1,9 @@
 package com.als.togcat.engine;
 
 import com.als.togcat.connector.HttpExchangeRequest;
+import com.als.togcat.engine.support.HttpHeaders;
+import com.als.togcat.engine.support.Parameters;
+import com.als.togcat.utils.HttpUtils;
 import jakarta.servlet.AsyncContext;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.RequestDispatcher;
@@ -17,16 +20,21 @@ import jakarta.servlet.http.HttpUpgradeHandler;
 import jakarta.servlet.http.Part;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -37,11 +45,29 @@ import java.util.regex.Pattern;
  * @date 2024/1/29 下午3:48
  */
 public class HttpServletRequestImpl implements HttpServletRequest {
+    final ServletContextImpl servletContext;
     final HttpExchangeRequest httpExchangeRequest;
+    final HttpServletResponse response;
+    final HttpHeaders headers;
+    final Parameters parameters;
 
-    public HttpServletRequestImpl(HttpExchangeRequest httpExchangeRequest) {
+
+    Boolean inputCalled = null;
+
+
+    public HttpServletRequestImpl(ServletContextImpl servletContext, HttpExchangeRequest httpExchangeRequest, HttpServletResponse response) {
+        this.servletContext = servletContext;
         this.httpExchangeRequest = httpExchangeRequest;
+        this.response = response;
+        this.headers = new HttpHeaders(httpExchangeRequest.getRequestHeaders());
+        ;
+        this.parameters = new Parameters(httpExchangeRequest, "UTF-8");
+        ;
     }
+
+//    public HttpServletRequestImpl(HttpExchangeRequest httpExchangeRequest) {
+//        this.httpExchangeRequest = httpExchangeRequest;
+//    }
 
     @Override
     public String getAuthType() {
@@ -50,32 +76,38 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public Cookie[] getCookies() {
-        return new Cookie[0];
+        String cookieValue = this.getHeader("Cookie");
+        return HttpUtils.parseCookies(cookieValue);
+
     }
 
     @Override
     public long getDateHeader(String s) {
-        return 0;
+        return this.headers.getDateHeader(s);
     }
 
     @Override
     public String getHeader(String s) {
-        return null;
+        return this.headers.getHeader(s);
     }
 
     @Override
     public Enumeration<String> getHeaders(String s) {
-        return null;
+        List<String> hs = this.headers.getHeaders(s);
+        if (hs == null) {
+            return Collections.emptyEnumeration();
+        }
+        return Collections.enumeration(hs);
     }
 
     @Override
     public Enumeration<String> getHeaderNames() {
-        return null;
+        return Collections.enumeration(this.headers.getHeaderNames());
     }
 
     @Override
     public int getIntHeader(String s) {
-        return 0;
+        return this.headers.getIntHeader(s);
     }
 
     @Override
@@ -140,17 +172,39 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public HttpSession getSession(boolean b) {
-        return null;
+        String sessionId = null;
+        Cookie[] cookies = getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if ("JSESSIONID".equals(cookie.getName())) {
+                    sessionId = cookie.getValue();
+                    break;
+                }
+            }
+        }
+        if (sessionId == null && !b) {
+            return null;
+        }
+        if (sessionId == null) {
+            if (this.response.isCommitted()) {
+                throw new IllegalStateException("Cannot create session for response is commited.");
+            }
+            sessionId = UUID.randomUUID().toString();
+            // set cookie:
+            String cookieValue = "JSESSIONID=" + sessionId + "; Path=/; SameSite=Strict; HttpOnly";
+            this.response.addHeader("Set-Cookie", cookieValue);
+        }
+        return this.servletContext.sessionManager.getSession(sessionId);
     }
 
     @Override
     public HttpSession getSession() {
-        return null;
+        return getSession(true);
     }
 
     @Override
     public String changeSessionId() {
-        return null;
+        throw new UnsupportedOperationException("changeSessionId() is not supported.");
     }
 
     @Override
@@ -160,7 +214,7 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public boolean isRequestedSessionIdFromCookie() {
-        return false;
+        return true;
     }
 
     @Override
@@ -240,29 +294,39 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public ServletInputStream getInputStream() throws IOException {
-        return null;
+        if (this.inputCalled == null) {
+            this.inputCalled = Boolean.TRUE;
+            return new ServletInputStreamImpl(this.httpExchangeRequest.getRequestBody());
+        }
+        throw new IllegalStateException("Cannot reopen input stream after " + (this.inputCalled ? "getInputStream()" : "getReader()") + " was called.");
     }
 
     @Override
     public String getParameter(String s) {
-        String rawQuery = this.httpExchangeRequest.getRequestURI().getRawQuery();
-        if (rawQuery != null) {
-            Map<String, String> map = null;
-            try {
-                map = parseQuery(rawQuery);
-            } catch (UnsupportedEncodingException e) {
-                e.printStackTrace();
-            }
-            return map.get(s);
-        }
-        return null;
+//        String rawQuery = this.httpExchangeRequest.getRequestURI().getRawQuery();
+//        if (rawQuery != null) {
+//            Map<String, String> map = null;
+//            try {
+//                map = parseQuery(rawQuery);
+//            } catch (UnsupportedEncodingException e) {
+//                e.printStackTrace();
+//            }
+//            return map.get(s);
+//        }
+//        return null;
+        return this.parameters.getParameter(s);
     }
 
     private Map<String, String> parseQuery(String rawQuery) throws UnsupportedEncodingException {
         if (rawQuery == null || rawQuery.isEmpty()) {
             return new HashMap<>(8);
         }
-        String[] ss = Pattern.compile("\\&").split(rawQuery);
+        String[] ss = new String[0];
+        try {
+            ss = Pattern.compile("\\&").split(rawQuery);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         Map<String, String> map = new HashMap<>(ss.length < 8 ? 8 : ss.length);
         for (String s : ss) {
             int n = s.indexOf('=');
@@ -272,21 +336,22 @@ public class HttpServletRequestImpl implements HttpServletRequest {
                 map.putIfAbsent(key, URLDecoder.decode(value, StandardCharsets.UTF_8.toString()));
             }
         }
-        return map;    }
+        return map;
+    }
 
     @Override
     public Enumeration<String> getParameterNames() {
-        return null;
+        return this.parameters.getParameterNames();
     }
 
     @Override
     public String[] getParameterValues(String s) {
-        return new String[0];
+        return this.parameters.getParameterValues(s);
     }
 
     @Override
     public Map<String, String[]> getParameterMap() {
-        return null;
+        return this.parameters.getParameterMap();
     }
 
     @Override
@@ -311,7 +376,11 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public BufferedReader getReader() throws IOException {
-        return null;
+        if (this.inputCalled == null) {
+            this.inputCalled = Boolean.FALSE;
+            return new BufferedReader(new InputStreamReader(new ByteArrayInputStream(this.httpExchangeRequest.getRequestBody()), StandardCharsets.UTF_8));
+        }
+        throw new IllegalStateException("Cannot reopen input stream after " + (this.inputCalled ? "getInputStream()" : "getReader()") + " was called.");
     }
 
     @Override
