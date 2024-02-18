@@ -41,6 +41,7 @@ public class LoginServlet extends HttpServlet {
                         "                        <p>Invalid username or password.</p>\n" +
                         "                        <p><a href=\"/\">Try again</a></p>";
 
+                pw.write(html);
             }
         } else {
             req.getSession().setAttribute("username", username);

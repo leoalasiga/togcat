@@ -12,7 +12,6 @@ import com.als.togcat.engine.servlet.LogoutServlet;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import com.sun.tools.javac.util.List;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -23,6 +22,7 @@ import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.util.Arrays;
 
 /**
  * TODO
@@ -43,8 +43,8 @@ public class HttpConnector implements HttpHandler,AutoCloseable {
     //    final Duration stopDelay = Duration.ofSeconds(5);
     public HttpConnector() throws IOException {
         this.servletContext = new ServletContextImpl();
-        this.servletContext.initServlets(List.of(IndexServlet.class, LoginServlet.class, LogoutServlet.class, HelloServlet.class));
-        this.servletContext.initFilters(List.of(LogFilter.class, HelloFilter.class));
+        this.servletContext.initServlets(Arrays.asList(IndexServlet.class, LoginServlet.class, LogoutServlet.class, HelloServlet.class));
+        this.servletContext.initFilters(Arrays.asList(LogFilter.class, HelloFilter.class));
 
 
         // start http server:
