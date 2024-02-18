@@ -1,6 +1,7 @@
 package com.als.togcat.engine;
 
 import com.als.togcat.connector.HttpExchangeRequest;
+import com.als.togcat.engine.support.Attributes;
 import com.als.togcat.engine.support.HttpHeaders;
 import com.als.togcat.engine.support.Parameters;
 import com.als.togcat.utils.HttpUtils;
@@ -24,18 +25,14 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Pattern;
+
+import static java.util.regex.Pattern.*;
 
 /**
  * TODO
@@ -48,8 +45,17 @@ public class HttpServletRequestImpl implements HttpServletRequest {
     final ServletContextImpl servletContext;
     final HttpExchangeRequest httpExchangeRequest;
     final HttpServletResponse response;
+    final String method;
     final HttpHeaders headers;
     final Parameters parameters;
+
+    String characterEncoding;
+    int contentLength = 0;
+
+    //这个版本的api没有getRequestId方法
+//    String requestId = null;
+
+    Attributes attributes = new Attributes();
 
 
     Boolean inputCalled = null;
@@ -59,10 +65,15 @@ public class HttpServletRequestImpl implements HttpServletRequest {
         this.servletContext = servletContext;
         this.httpExchangeRequest = httpExchangeRequest;
         this.response = response;
+        this.characterEncoding = "UTF-8";
         this.headers = new HttpHeaders(httpExchangeRequest.getRequestHeaders());
-        ;
-        this.parameters = new Parameters(httpExchangeRequest, "UTF-8");
-        ;
+        this.parameters = new Parameters(httpExchangeRequest, this.characterEncoding);
+        this.method = httpExchangeRequest.getRequestMethod();
+        if ("POST".equals(this.method) || "PUT".equals(this.method) || "DELETE".equals(this.method) || "PATCH".equals(this.method)) {
+            this.contentLength = getIntHeader("Content-Length");
+        }
+
+
     }
 
 //    public HttpServletRequestImpl(HttpExchangeRequest httpExchangeRequest) {
@@ -112,7 +123,7 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public String getMethod() {
-        return httpExchangeRequest.getRequestMethod();
+        return this.method;
     }
 
     @Override
@@ -122,31 +133,35 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public String getPathTranslated() {
-        return null;
+        return this.servletContext.getRealPath(getRequestURI());
     }
 
     @Override
     public String getContextPath() {
-        return null;
+        // root context path:
+        return "";
     }
 
     @Override
     public String getQueryString() {
-        return null;
+        return this.httpExchangeRequest.getRequestURI().getRawQuery();
     }
 
     @Override
     public String getRemoteUser() {
+        // not support auth:
         return null;
     }
 
     @Override
     public boolean isUserInRole(String s) {
+        // not support auth:
         return false;
     }
 
     @Override
     public Principal getUserPrincipal() {
+        // not support auth:
         return null;
     }
 
@@ -162,12 +177,14 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public StringBuffer getRequestURL() {
-        return null;
+        StringBuffer sb = new StringBuffer(128);
+        sb.append(getScheme()).append("://").append(getServerName()).append(':').append(getServerPort()).append(getRequestURI());
+        return sb;
     }
 
     @Override
     public String getServletPath() {
-        return null;
+        return getRequestURI();
     }
 
     @Override
@@ -229,67 +246,73 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public boolean authenticate(HttpServletResponse httpServletResponse) throws IOException, ServletException {
+        // not support auth:
         return false;
     }
 
     @Override
     public void login(String s, String s1) throws ServletException {
+        // not support auth:
 
     }
 
     @Override
     public void logout() throws ServletException {
+        // not support auth:
 
     }
 
     @Override
     public Collection<Part> getParts() throws IOException, ServletException {
-        return null;
+        return new ArrayList<>();
     }
 
     @Override
     public Part getPart(String s) throws IOException, ServletException {
+        // not support multipart:
         return null;
     }
 
     @Override
     public <T extends HttpUpgradeHandler> T upgrade(Class<T> aClass) throws IOException, ServletException {
+        // not suport websocket:
         return null;
     }
 
     @Override
     public Object getAttribute(String s) {
-        return null;
+        return this.attributes.getAttribute(s);
     }
 
     @Override
     public Enumeration<String> getAttributeNames() {
-        return null;
+        return this.attributes.getAttributeNames();
     }
 
     @Override
     public String getCharacterEncoding() {
-        return null;
+        return this.characterEncoding;
     }
 
     @Override
-    public void setCharacterEncoding(String s) throws UnsupportedEncodingException {
-
+    public void setCharacterEncoding(String env) throws UnsupportedEncodingException {
+        this.characterEncoding = env;
+        this.parameters.setCharset(env);
     }
 
     @Override
     public int getContentLength() {
-        return 0;
+        return this.contentLength;
     }
 
     @Override
     public long getContentLengthLong() {
-        return 0;
+        return this.contentLength;
     }
 
     @Override
     public String getContentType() {
-        return null;
+        return getHeader("Content-Type");
     }
 
     @Override
@@ -323,7 +346,7 @@ public class HttpServletRequestImpl implements HttpServletRequest {
         }
         String[] ss = new String[0];
         try {
-            ss = Pattern.compile("\\&").split(rawQuery);
+            ss = compile("\\&").split(rawQuery);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -356,22 +379,23 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public String getProtocol() {
-        return null;
+        return "HTTP/1.1";
     }
 
     @Override
     public String getScheme() {
-        return null;
+        return "http";
     }
 
     @Override
     public String getServerName() {
-        return null;
+        return "localhost";
     }
 
     @Override
     public int getServerPort() {
-        return 0;
+        InetSocketAddress address = this.httpExchangeRequest.getLocalAddress();
+        return address.getPort();
     }
 
     @Override
@@ -385,32 +409,44 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public String getRemoteAddr() {
-        return null;
+        InetSocketAddress address = this.httpExchangeRequest.getRemoteAddress();
+        return address.getHostString();
     }
 
     @Override
     public String getRemoteHost() {
-        return null;
+        // avoid DNS lookup by IP:
+        return getRemoteAddr();
     }
 
     @Override
-    public void setAttribute(String s, Object o) {
-
+    public void setAttribute(String name, Object value) {
+        if (value == null) {
+            removeAttribute(name);
+        } else {
+            Object oldValue = this.attributes.setAttribute(name, value);
+            if (oldValue == null) {
+                this.servletContext.invokeServletRequestAttributeAdded(this, name, value);
+            } else {
+                this.servletContext.invokeServletRequestAttributeReplaced(this, name, value);
+            }
+        }
     }
 
     @Override
-    public void removeAttribute(String s) {
-
+    public void removeAttribute(String name) {
+        Object oldValue = this.attributes.removeAttribute(name);
+        this.servletContext.invokeServletRequestAttributeRemoved(this, name, oldValue);
     }
 
     @Override
     public Locale getLocale() {
-        return null;
+        return Locale.CHINA;
     }
 
     @Override
     public Enumeration<Locale> getLocales() {
-        return null;
+        return Collections.enumeration(Arrays.asList(Locale.CHINA, Locale.US));
     }
 
     @Override
@@ -430,37 +466,40 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public int getRemotePort() {
-        return 0;
+        InetSocketAddress address = this.httpExchangeRequest.getRemoteAddress();
+        return address.getPort();
     }
 
     @Override
     public String getLocalName() {
-        return null;
+        return getLocalAddr();
     }
 
     @Override
     public String getLocalAddr() {
-        return null;
+        InetSocketAddress address = this.httpExchangeRequest.getLocalAddress();
+        return address.getHostString();
     }
 
     @Override
     public int getLocalPort() {
-        return 0;
+        InetSocketAddress address = this.httpExchangeRequest.getLocalAddress();
+        return address.getPort();
     }
 
     @Override
     public ServletContext getServletContext() {
-        return null;
+        return this.servletContext;
     }
 
     @Override
     public AsyncContext startAsync() throws IllegalStateException {
-        return null;
+        throw new IllegalStateException("Async is not supported.");
     }
 
     @Override
     public AsyncContext startAsync(ServletRequest servletRequest, ServletResponse servletResponse) throws IllegalStateException {
-        return null;
+        throw new IllegalStateException("Async is not supported.");
     }
 
     @Override
@@ -475,11 +514,16 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public AsyncContext getAsyncContext() {
-        return null;
+        throw new IllegalStateException("Async is not supported.");
     }
 
     @Override
     public DispatcherType getDispatcherType() {
-        return null;
+        return DispatcherType.REQUEST;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("HttpServletRequestImpl@%s[%s:%s]", Integer.toHexString(hashCode()), getMethod(), getRequestURI());
     }
 }

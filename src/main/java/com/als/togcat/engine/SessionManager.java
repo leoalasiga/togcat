@@ -36,6 +36,7 @@ public class SessionManager implements Runnable {
         if (session == null) {
             session = new HttpSessionImpl(this.servletContext, sessionId, inactiveInterval);
             sessions.put(sessionId, session);
+            this.servletContext.invokeHttpSessionCreated(session);
         } else {
             session.lastAccessedTime = System.currentTimeMillis();
         }
@@ -45,6 +46,7 @@ public class SessionManager implements Runnable {
 
     public void remove(HttpSession session) {
         this.sessions.remove(session.getId());
+        this.servletContext.invokeHttpSessionDestroyed(session);
     }
 
     @Override

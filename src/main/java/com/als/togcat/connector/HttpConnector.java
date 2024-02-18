@@ -5,6 +5,7 @@ import com.als.togcat.engine.HttpServletResponseImpl;
 import com.als.togcat.engine.ServletContextImpl;
 import com.als.togcat.engine.filter.HelloFilter;
 import com.als.togcat.engine.filter.LogFilter;
+import com.als.togcat.engine.listener.*;
 import com.als.togcat.engine.servlet.HelloServlet;
 import com.als.togcat.engine.servlet.IndexServlet;
 import com.als.togcat.engine.servlet.LoginServlet;
@@ -23,6 +24,8 @@ import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.EventListener;
+import java.util.List;
 
 /**
  * TODO
@@ -46,6 +49,12 @@ public class HttpConnector implements HttpHandler,AutoCloseable {
         this.servletContext.initServlets(Arrays.asList(IndexServlet.class, LoginServlet.class, LogoutServlet.class, HelloServlet.class));
         this.servletContext.initFilters(Arrays.asList(LogFilter.class, HelloFilter.class));
 
+        //  =================version4  add listener
+        List<Class<? extends EventListener>> eventListeners = Arrays.asList(TogHttpSessionAttributeListener.class, TogHttpSessionListener.class, TogServletContextAttributeListener.class, TogServletContextListener.class
+                , TogServletRequestAttributeListener.class, TogServletRequestListener.class);
+        for (Class<? extends EventListener> eventListener : eventListeners) {
+            this.servletContext.addListener(eventListener);
+        }
 
         // start http server:
         String host = "0.0.0.0";

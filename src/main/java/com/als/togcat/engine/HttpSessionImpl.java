@@ -31,7 +31,6 @@ public class HttpSessionImpl implements HttpSession {
     }
 
 
-
     @Override
     public long getCreationTime() {
         return creationTime;
@@ -70,7 +69,8 @@ public class HttpSessionImpl implements HttpSession {
     @Override
     public Object getAttribute(String s) {
         checkValid();
-        return this.attributes.getAttribute(s);    }
+        return this.attributes.getAttribute(s);
+    }
 
     @Override
     public Object getValue(String s) {
@@ -80,7 +80,8 @@ public class HttpSessionImpl implements HttpSession {
     @Override
     public Enumeration<String> getAttributeNames() {
         checkValid();
-        return this.attributes.getAttributeNames();    }
+        return this.attributes.getAttributeNames();
+    }
 
     @Override
     public String[] getValueNames() {
@@ -88,12 +89,18 @@ public class HttpSessionImpl implements HttpSession {
     }
 
     @Override
-    public void setAttribute(String s, Object o) {
+    public void setAttribute(String name, Object val) {
         checkValid();
-        if (s == null) {
-            removeAttribute(s);
+        if (val == null) {
+            removeAttribute(name);
         } else {
-            this.attributes.setAttribute(s, o);
+//            this.attributes.setAttribute(name, val);
+            Object oldValue = this.attributes.setAttribute(name, val);
+            if (oldValue == null) {
+                this.servletContext.invokeHttpSessionAttributeAdded(this, name, val);
+            } else {
+                this.servletContext.invokeHttpSessionAttributeReplaced(this, name, val);
+            }
         }
     }
 
@@ -105,8 +112,10 @@ public class HttpSessionImpl implements HttpSession {
     @Override
     public void removeAttribute(String s) {
         checkValid();
-        this.attributes.removeAttribute(s);
+        Object o = this.attributes.removeAttribute(s);
+        this.servletContext.invokeHttpSessionAttributeRemoved(this, s, o);
     }
+
 
     @Override
     public void removeValue(String s) {
