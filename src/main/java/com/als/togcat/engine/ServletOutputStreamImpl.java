@@ -8,7 +8,7 @@ import java.io.OutputStream;
 import java.io.UncheckedIOException;
 
 /**
- * TODO
+ * ServletOutputStream 是 Java Servlet 中的一个类，它提供了输出二进制数据到客户端的功能。在Servlet开发中，用于向客户端发送二进制数据（如文件、图像等）时，通常会使用 ServletOutputStream。
  *
  * @author 刘嘉杰
  * @version 1.0.0

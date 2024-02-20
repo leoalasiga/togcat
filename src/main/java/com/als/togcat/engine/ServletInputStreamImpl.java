@@ -6,7 +6,7 @@ import jakarta.servlet.ServletInputStream;
 import java.io.IOException;
 
 /**
- * TODO
+ * ServletInputStream 是用于从客户端读取请求数据的抽象类。这类通常由Servlet容器提供，并由Servlet开发者使用，而不需要直接实现它。
  *
  * @author 刘嘉杰
  * @version 1.0.0

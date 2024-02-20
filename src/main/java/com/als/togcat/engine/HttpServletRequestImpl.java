@@ -1,5 +1,6 @@
 package com.als.togcat.engine;
 
+import com.als.togcat.Config;
 import com.als.togcat.connector.HttpExchangeRequest;
 import com.als.togcat.engine.support.Attributes;
 import com.als.togcat.engine.support.HttpHeaders;
@@ -42,6 +43,7 @@ import static java.util.regex.Pattern.*;
  * @date 2024/1/29 下午3:48
  */
 public class HttpServletRequestImpl implements HttpServletRequest {
+    final Config config;
     final ServletContextImpl servletContext;
     final HttpExchangeRequest httpExchangeRequest;
     final HttpServletResponse response;
@@ -61,11 +63,13 @@ public class HttpServletRequestImpl implements HttpServletRequest {
     Boolean inputCalled = null;
 
 
-    public HttpServletRequestImpl(ServletContextImpl servletContext, HttpExchangeRequest httpExchangeRequest, HttpServletResponse response) {
+    public HttpServletRequestImpl(Config config,ServletContextImpl servletContext, HttpExchangeRequest httpExchangeRequest, HttpServletResponse response) {
+        this.config = config;
         this.servletContext = servletContext;
         this.httpExchangeRequest = httpExchangeRequest;
         this.response = response;
-        this.characterEncoding = "UTF-8";
+//        this.characterEncoding = "UTF-8";
+        this.characterEncoding = config.server.requestEncoding;
         this.headers = new HttpHeaders(httpExchangeRequest.getRequestHeaders());
         this.parameters = new Parameters(httpExchangeRequest, this.characterEncoding);
         this.method = httpExchangeRequest.getRequestMethod();
@@ -193,7 +197,8 @@ public class HttpServletRequestImpl implements HttpServletRequest {
         Cookie[] cookies = getCookies();
         if (cookies != null) {
             for (Cookie cookie : cookies) {
-                if ("JSESSIONID".equals(cookie.getName())) {
+//                if ("JSESSIONID".equals(cookie.getName())) {
+                if (config.server.webApp.sessionCookieName.equals(cookie.getName())) {
                     sessionId = cookie.getValue();
                     break;
                 }
@@ -208,7 +213,8 @@ public class HttpServletRequestImpl implements HttpServletRequest {
             }
             sessionId = UUID.randomUUID().toString();
             // set cookie:
-            String cookieValue = "JSESSIONID=" + sessionId + "; Path=/; SameSite=Strict; HttpOnly";
+//            String cookieValue = "JSESSIONID=" + sessionId + "; Path=/; SameSite=Strict; HttpOnly";
+            String cookieValue = config.server.webApp.sessionCookieName + "=" + sessionId + "; Path=/; SameSite=Strict; HttpOnly";
             this.response.addHeader("Set-Cookie", cookieValue);
         }
         return this.servletContext.sessionManager.getSession(sessionId);
@@ -384,12 +390,34 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public String getScheme() {
-        return "http";
+        String header = "http";
+        String forwarded = config.server.forwardedHeaders.forwardedProto;
+        if (!forwarded.isEmpty()) {
+            String forwardedHeader = getHeader(forwarded);
+            if (forwardedHeader != null) {
+                header = forwardedHeader;
+            }
+        }
+        return header;
+//        return "http";
     }
 
     @Override
     public String getServerName() {
-        return "localhost";
+        String header = getHeader("Host");
+        String forwarded = config.server.forwardedHeaders.forwardedHost;
+        if (!forwarded.isEmpty()) {
+            String forwardedHeader = getHeader(forwarded);
+            if (forwardedHeader != null) {
+                header = forwardedHeader;
+            }
+        }
+        if (header == null) {
+            InetSocketAddress address = this.httpExchangeRequest.getLocalAddress();
+            header = address.getHostString();
+        }
+        return header;
+//        return "localhost";
     }
 
     @Override
@@ -409,8 +437,22 @@ public class HttpServletRequestImpl implements HttpServletRequest {
 
     @Override
     public String getRemoteAddr() {
-        InetSocketAddress address = this.httpExchangeRequest.getRemoteAddress();
-        return address.getHostString();
+        String addr = null;
+        String forwarded = config.server.forwardedHeaders.forwardedFor;
+        if (forwarded != null && !forwarded.isEmpty()) {
+            String forwardedHeader = getHeader(forwarded);
+            if (forwardedHeader != null) {
+                int n = forwardedHeader.indexOf(',');
+                addr = n < 0 ? forwardedHeader : forwardedHeader.substring(n);
+            }
+        }
+        if (addr == null) {
+            InetSocketAddress address = this.httpExchangeRequest.getRemoteAddress();
+            addr = address.getHostString();
+        }
+        return addr;
+//        InetSocketAddress address = this.httpExchangeRequest.getRemoteAddress();
+//        return address.getHostString();
     }
 
     @Override

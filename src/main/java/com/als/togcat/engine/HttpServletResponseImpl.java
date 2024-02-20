@@ -1,5 +1,6 @@
 package com.als.togcat.engine;
 
+import com.als.togcat.Config;
 import com.als.togcat.connector.HttpExchangeResponse;
 import com.als.togcat.engine.support.HttpHeaders;
 import jakarta.servlet.ServletOutputStream;
@@ -22,6 +23,7 @@ import java.util.Locale;
  * @date 2024/1/29 下午3:49
  */
 public class HttpServletResponseImpl implements HttpServletResponse {
+    final Config config;
     final HttpExchangeResponse httpExchangeResponse;
     final HttpHeaders headers;
 
@@ -38,10 +40,12 @@ public class HttpServletResponseImpl implements HttpServletResponse {
     List<Cookie> cookies = null;
     boolean committed = false;
 
-    public HttpServletResponseImpl(HttpExchangeResponse httpExchangeResponse) {
+    public HttpServletResponseImpl(Config config,HttpExchangeResponse httpExchangeResponse) {
+        this.config = config;
         this.httpExchangeResponse = httpExchangeResponse;
         this.headers = new HttpHeaders(httpExchangeResponse.getResponseHeaders());
-        this.characterEncoding = "UTF-8";
+//        this.characterEncoding = "UTF-8";
+        this.characterEncoding = config.server.responseEncoding;
         this.setContentType("text/html");
     }
 

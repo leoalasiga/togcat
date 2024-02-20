@@ -24,7 +24,7 @@ http://www.example.com/abc/hello
 
 
 
-## servlet规范
+#### servlet规范
 
 在Java Web应用中，除了Tomcat服务器外，其实还有[Jetty](https://eclipse.dev/jetty/)、[GlassFish](https://javaee.github.io/glassfish/)、[Undertow](https://undertow.io/)等多种Web服务器。
 
@@ -75,7 +75,7 @@ Servlet 6.0：继续增加一些新功能，并废除一部分功能。
 
 目前最新的Servlet版本是6.0，我们开发Jerrymouse Server也是基于最新的Servlet 6.0。
 
-### Servlet处理流程
+#### Servlet处理流程
 
 当Servlet容器接收到用户的HTTP请求后，由容器负责把请求转换为`HttpServletRequest`和`HttpServletResponse`对象，分别代表HTTP请求和响应，然后，经过若干个Filter组件后，到达最终的Servlet组件，由Servlet组件完成HTTP处理，将响应写入`HttpServletResponse`对象：
 
@@ -116,7 +116,7 @@ Servlet 6.0：继续增加一些新功能，并废除一部分功能。
 
 
 
-## togcat架构
+#### togcat架构
 
 我们设计的Jerrymouse Server的架构如下：
 
@@ -259,7 +259,7 @@ public class SimpleHttpServer implements HttpHandler, AutoCloseable {
 
 
 
-## 实现servlet服务
+#### 实现servlet服务
 
 我们已经成功实现了一个简单的HTTP服务器，但是，好像和Servlet没啥关系，因为整个操作都是基于`HttpExchange`接口做的。
 
@@ -393,7 +393,7 @@ hello world
 
 
 
-## 实现ServletContext
+#### 实现ServletContext
 
 在Java Web应用程序中，`ServletContext`代表应用程序的运行环境，一个Web应用程序对应一个唯一的`ServletContext`实例，`ServletContext`可以用于：
 
@@ -554,7 +554,9 @@ hello bob
 
 输入错误的路径，查看404输出
 
+##### 小结
 
+编写Servlet容器时，直接实现`ServletContext`接口，并在内部完成所有Servlet的管理，就可以实现根据路径路由到匹配的Servlet。
 
 #### 实现FilterChain
 
@@ -778,3 +780,519 @@ public class FilterChainImpl implements FilterChain {
 一是和Servlet一样，Filter本身应该是Web App开发人员实现，而不是由服务器实现。我们在在服务器中写死了两个Filter，这个问题后续解决；
 
 二是Servlet规范并没有规定多个Filter应该如何排序，我们在实现时也没有对Filter进行排序。如果要按固定顺序给Filter排序，从Servlet规范来说怎么排序都可以，通常是按`@WebFilter`定义的`filterName`进行排序，Spring Boot提供的一个`FilterRegistrationBean`允许开发人员自己定义Filter的顺序。
+
+##### 小结
+
+实现`FilterChain`时，要首先在`ServletContext`内完成所有Filter的初始化和映射，然后，根据请求路径匹配所有合适的Filter和唯一的Servlet，构造`FilterChain`并处理请求
+
+#### 实现HttpSession
+
+HttpSession是Java Web App的一种机制，用于在客户端和服务器之间维护会话状态信息。
+
+##### Session原理
+
+当客户端第一次请求Web应用程序时，服务器会为该客户端创建一个唯一的Session ID，该ID本质上是一个随机字符串，然后，将该ID存储在客户端的一个名为`JSESSIONID`的Cookie中。与此同时，服务器会在内存中创建一个`HttpSession`对象，与Session ID关联，用于存储与该客户端相关的状态信息。
+
+当客户端发送后续请求时，服务器根据客户端发送的名为`JSESSIONID`的Cookie中获得Session ID，然后查找对应的`HttpSession`对象，并从中读取或继续写入状态信息。
+
+##### Session用途
+
+Session主要用于维护一个客户端的会话状态。通常，用户成功登录后，可以通过如下代码创建一个新的`HttpSession`，并将用户ID、用户名等信息放入`HttpSession`：
+
+```
+@WebServlet(urlPatterns = "/login")
+public class LoginServlet extends HttpServlet {
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        String username = req.getParameter("username");
+        String password = req.getParameter("password");
+        if (loginOk(username, password)) {
+            // 登录成功，获取Session:
+            HttpSession session = req.getSession();
+            // 将用户名放入Session:
+            session.setAttribute("username", username);
+            // 返回首页:
+            resp.sendRedirect("/");
+        } else {
+            // 登录失败:
+            resp.sendRedirect("/error");
+        }
+    }
+}
+```
+
+在其他页面，可以随时获取`HttpSession`并取出用户信息，然后在页面展示给用户：
+
+```
+@WebServlet(urlPatterns = "/")
+public class IndexServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        // 获取Session:
+        HttpSession session = req.getSession();
+        // 从Session中取出用户名:
+        String username = (String) session.getAttribute("username");
+        if (username == null) {
+            // 未获取到用户名，说明未登录:
+            resp.sendRedirect("/login");
+        } else {
+            // 获取到用户名，说明已登录:
+            String html = "<p>Welcome, " + username + "!</p>";
+            resp.setContentType("text/html");
+            PrintWriter pw = resp.getWriter();
+            pw.write(html);
+            pw.close();
+        }
+    }
+}
+```
+
+当用户登出时，需要调用`HttpSession`的`invalidate()`方法，让会话失效，这样，用户将重新回到未登录状态，因为后续调用`req.getSession()`将返回一个新的`HttpSession`，从这个新的`HttpSession`取出的`username`将是`null`。
+
+##### HttpSession的生命周期
+
+第一次调用`req.getSession()`时，服务器会为该客户端创建一个新的`HttpSession`对象；
+
+后续调用`req.getSession()`时，服务器会返回与之关联的`HttpSession`对象；
+
+调用`req.getSession().invalidate()`时，服务器会销毁该客户端对应的`HttpSession`对象；
+
+当客户端一段时间内没有新的请求，服务器会根据Session超时自动销毁超时的`HttpSession`对象。
+
+##### HttpSession接口
+
+`HttpSession`是一个接口，Java的Web应用调用`HttpServletRequest`的`getSession()`方法时，需要返回一个`HttpSession`的实现类。
+
+了解了以上关于`HttpSession`的相关规范后，我们就可以开始实现对`HttpSession`的支持。
+
+首先，我们需要一个`SessionManager`，用来管理所有的Session：
+
+```
+public class SessionManager {
+    // 引用ServletContext:
+    ServletContextImpl servletContext;
+    // 持有SessionID -> Session:
+    Map<String, HttpSessionImpl> sessions = new ConcurrentHashMap<>();
+    // Session默认过期时间(秒):
+    int inactiveInterval;
+
+    // 根据SessionID获取一个Session:
+    public HttpSession getSession(String sessionId) {
+        HttpSessionImpl session = sessions.get(sessionId);
+        if (session == null) {
+            // Session未找到，创建一个新的Session:
+            session = new HttpSessionImpl(this.servletContext, sessionId, inactiveInterval);
+            sessions.put(sessionId, session);
+        } else {
+            // Session已存在，更新最后访问时间:
+            session.lastAccessedTime = System.currentTimeMillis();
+        }
+        return session;
+    }
+
+    // 删除Session:
+    public void remove(HttpSession session) {
+        this.sessions.remove(session.getId());
+    }
+}
+```
+
+`SessionManager`由`ServletContextImpl`持有唯一实例。
+
+再编写一个`HttpSession`的实现类`HttpSessionImpl`：
+
+```
+public class HttpSessionImpl implements HttpSession {
+
+    ServletContextImpl servletContext; // ServletContext
+    String sessionId; // SessionID
+    int maxInactiveInterval; // 过期时间(s)
+    long creationTime; // 创建时间(ms)
+    long lastAccessedTime; // 最后一次访问时间(ms)
+    Attributes attributes; // getAttribute/setAttribute
+}
+```
+
+然后，我们分析一下用户调用Session的代码：
+
+```
+HttpSession session = request.getSession();
+session.invalidate();
+```
+
+由于`HttpSession`是从`HttpServletRequest`获得的，因此，必须在`HttpServletRequestImpl`中引用`ServletContextImpl`，才能访问`SessionManager`：
+
+```
+public class HttpServletRequestImpl implements HttpServletRequest {
+    // 引用ServletContextImpl:
+    ServletContextImpl servletContext;
+    // 引用HttpServletResponse:
+    HttpServletResponse response;
+
+    @Override
+    public HttpSession getSession(boolean create) {
+        String sessionId = null;
+        // 获取所有Cookie:
+        Cookie[] cookies = getCookies();
+        if (cookies != null) {
+            // 查找JSESSIONID:
+            for (Cookie cookie : cookies) {
+                if ("JSESSIONID".equals(cookie.getName())) {
+                    // 拿到Session ID:
+                    sessionId = cookie.getValue();
+                    break;
+                }
+            }
+        }
+        // 未获取到SessionID，且create=false，返回null:
+        if (sessionId == null && !create) {
+            return null;
+        }
+        // 未获取到SessionID，但create=true，创建新的Session:
+        if (sessionId == null) {
+            // 如果Header已经发送，则无法创建Session，因为无法添加Cookie:
+            if (this.response.isCommitted()) {
+                throw new IllegalStateException("Cannot create session for response is commited.");
+            }
+            // 创建随机字符串作为SessionID:
+            sessionId = UUID.randomUUID().toString();
+            // 构造一个名为JSESSIONID的Cookie:
+            String cookieValue = "JSESSIONID=" + sessionId + "; Path=/; SameSite=Strict; HttpOnly";
+            // 添加到HttpServletResponse的Header:
+            this.response.addHeader("Set-Cookie", cookieValue);
+        }
+        // 返回一个Session对象:
+        return this.servletContext.sessionManager.getSession(sessionId);
+    }
+
+    @Override
+    public HttpSession getSession() {
+        return getSession(true);
+    }
+    ...
+}
+```
+
+对`HttpServletRequestImpl`的改造主要是加入了`ServletContextImpl`和`HttpServletResponse`的引用：可以通过前者访问到`SessionManager`，而创建的新的SessionID需要通过后者把Cookie发送到客户端，因此，在`HttpConnector`中，做相应的修改如下：
+
+```
+public class HttpConnector implements HttpHandler {
+    ...
+    @Override
+    public void handle(HttpExchange exchange) throws IOException {
+        var adapter = new HttpExchangeAdapter(exchange);
+        var response = new HttpServletResponseImpl(adapter);
+        // 创建Request时，需要引用servletContext和response:
+        var request = new HttpServletRequestImpl(this.servletContext, adapter, response);
+        // process:
+        try {
+            this.servletContext.process(request, response);
+        } catch (Exception e) {
+            logger.error(e.getMessage(), e);
+        }
+    }
+}
+```
+
+当用户调用`session.invalidate()`时，要让Session失效，就需要从`SessionManager`中移除：
+
+```
+public class HttpSessionImpl implements HttpSession {
+    ...
+    @Override
+    public void invalidate() {
+        // 从SessionManager中移除:
+        this.servletContext.sessionManager.remove(this);
+        this.sessionId = null;
+    }
+    ...
+}
+```
+
+最后，我们还需要实现Session的自动过期。由于我们管理的Session实际上是以`Map<String, HttpSession>`存储的，所以，让Session自动过期就是定期扫描所有的Session，然后根据最后一次访问时间将过期的Session自动删除。给`SessionManager`加一个`Runnable`接口，并启动一个Daemon线程：
+
+```
+public class SessionManager implements Runnable {
+    ...
+    public SessionManager(ServletContextImpl servletContext, int interval) {
+        ...
+        // 启动Daemon线程:
+        Thread t = new Thread(this);
+        t.setDaemon(true);
+        t.start();
+    }
+
+    // 扫描线程:
+    @Override
+    public void run() {
+        for (;;) {
+            // 每60秒扫描一次:
+            try {
+                Thread.sleep(60_000L);
+            } catch (InterruptedException e) {
+                break;
+            }
+            // 当前时间:
+            long now = System.currentTimeMillis();
+            // 遍历Session:
+            for (String sessionId : sessions.keySet()) {
+                HttpSession session = sessions.get(sessionId);
+                // 判断是否过期:
+                if (session.getLastAccessedTime() + session.getMaxInactiveInterval() * 1000L < now) {
+                    // 删除过期的Session:
+                    logger.warn("remove expired session: {}, last access time: {}", sessionId, DateUtils.formatDateTimeGMT(session.getLastAccessedTime()));
+                    session.invalidate();
+                }
+            }
+        }
+    }
+```
+
+将`HttpServletRequest`和`HttpServletResponse`与Cookie相关的实现方法补全，我们就得到了一个基于Cookie的`HttpSession`实现！
+
+最后需要注意的一点是，和`HttpServletRequest`不同，访问`HttpServletRequest`实例的一定是一个线程，因此，`HttpServletRequest`的`getAttribute()`和`setAttribute()`不需要同步，底层存储用`HashMap`即可。但是，访问`HttpSession`实例的可能是多线程，所以，`HttpSession`的`getAttribute()`和`setAttribute()`需要实现并发访问，底层存储用`ConcurrentHashMap`即可。
+
+##### 测试HttpSession
+
+访问`IndexServlet`，第一次访问时，将获取到新的`HttpSession`，此时，`HttpSession`没有用户信息，因此显示登录表单：
+
+![index-login](https://www.liaoxuefeng.com/files/attachments/1557468186411073/l)
+
+登录成功后，可以看到用户名已放入`HttpSession`，`IndexServlet`从`HttpSession`获取到用户名后将用户名显示出来：
+
+![index-page](https://www.liaoxuefeng.com/files/attachments/1557467855061056/l)
+
+刷新页面，`IndexServlet`仍将显示登录的用户名，因为根据Cookie拿到相同的SessionID后，获取的`HttpSession`是同一个实例。
+
+由于我们设定的`HttpSession`过期时间是10分钟，等待至少10分钟，观察控制台输出：
+
+```
+21:41:38.001 [HTTP-Dispatcher] INFO  c.i.j.engine.filter.LogFilter -- GET: /
+21:42:05.586 [HTTP-Dispatcher] INFO  c.i.j.engine.filter.LogFilter -- GET: /
+21:52:15.578 [Thread-0] WARN  c.i.j.engine.SessionManagerImpl -- remove expired session: 899eb456-5aa3-40d4-8c64-ddc97d39c0d2, last access time: Fri, 14 Jul 2023 13:42:05 GMT
+```
+
+大约在21:52:15时清理了过期的Session，最后一次访问时间是21:42:05（注意时间需要经过时区调整），再次刷新页面将显示登录表单：
+
+![index-login](https://www.liaoxuefeng.com/files/attachments/1557468186411073/l)
+
+##### 小结
+
+使用Cookie模式实现`HttpSession`时，需要实现一个`HttpSessionManager`，它在内部维护一个Session ID到`HttpSession`实例的映射；
+
+`HttpSessionManager`通过定期扫描所有`HttpSession`，将过期的`HttpSession`自动删除，因此，Session自动失效的时间不是特别精确；
+
+由于没有对`HttpSession`进行持久化处理，重启服务器后，将丢失所有用户的Session。如果希望重启服务器后保留用户的Session，则需要将Session数据持久化到文件或数据库，此功能要求用户放入`HttpSession`的Java对象必须是可序列化的；
+
+因为Session不容易扩展，因此，大规模集群的Web App通常自己管理Cookie来实现登录功能，这样，将用户状态完全保存在浏览器端，不使用Session，服务器就可以做到无状态集群。
+
+
+
+#### 实现Listener
+
+在Java Web App中，除了Servlet、Filter和HttpSession外，还有一种Listener组件，用于事件监听。
+
+##### Listener原理
+
+Listener是Java Web App中的一种事件监听机制，用于监听Web应用程序中产生的事件，例如，在`ServletContext`初始化完成后，会触发`contextInitialized`事件，实现了`ServletContextListener`接口的Listener就可以接收到事件通知，可以在内部做一些初始化工作，如加载配置文件，初始化数据库连接池等。实现了`HttpSessionListener`接口的Listener可以接收到Session的创建和消耗事件，这样就可以统计在线用户数。
+
+Listener机制是基于[观察者模式](https://www.liaoxuefeng.com/wiki/1252599548343744/1281319577321505)实现的，即当某个事件发生时，Listener会接收到通知并执行相应的操作。
+
+##### Listener类型
+
+Servlet规范定义了很多种Listener接口，常用的Listener包括：
+
+- `ServletContextListener`：用于监听`ServletContext`的创建和销毁事件；
+- `HttpSessionListener`：用于监听`HttpSession`的创建和销毁事件；
+- `ServletRequestListener`：用于监听`ServletRequest`的创建和销毁事件；
+- `ServletContextAttributeListener`：用于监听`ServletContext`属性的添加、修改和删除事件；
+- `HttpSessionAttributeListener`：用于监听`HttpSession`属性的添加、修改和删除事件；
+- `ServletRequestAttributeListener`：用于监听`ServletRequest`属性的添加、修改和删除事件。
+
+下面我们就来实现上述常用的Listener。
+
+首先我们需要在`ServletContextImpl`中注册并管理所有的Listener，所以用不同的`List`持有注册的Listener：
+
+```
+public class ServletContextImpl implements ServletContext {
+    ...
+    private List<ServletContextListener> servletContextListeners = null;
+    private List<ServletContextAttributeListener> servletContextAttributeListeners = null;
+    private List<ServletRequestListener> servletRequestListeners = null;
+    private List<ServletRequestAttributeListener> servletRequestAttributeListeners = null;
+    private List<HttpSessionAttributeListener> httpSessionAttributeListeners = null;
+    private List<HttpSessionListener> httpSessionListeners = null;
+    ...
+}
+```
+
+然后，实现`ServletContext`的`addListener()`接口，用于注册Listener：
+
+```
+public class ServletContextImpl implements ServletContext {
+    ...
+    @Override
+    public void addListener(String className) {
+        addListener(Class.forName(className));
+    }
+
+    @Override
+    public void addListener(Class<? extends EventListener> clazz) {
+        addListener(clazz.newInstance());
+    }
+
+    @Override
+    public <T extends EventListener> void addListener(T t) {
+        // 根据Listener类型放入不同的List:
+        if (t instanceof ServletContextListener listener) {
+            if (this.servletContextListeners == null) {
+                this.servletContextListeners = new ArrayList<>();
+            }
+            this.servletContextListeners.add(listener);
+        } else if (t instanceof ServletContextAttributeListener listener) {
+            if (this.servletContextAttributeListeners == null) {
+                this.servletContextAttributeListeners = new ArrayList<>();
+            }
+            this.servletContextAttributeListeners.add(listener);
+        } else if ...
+            ...代码略...
+        } else {
+            throw new IllegalArgumentException("Unsupported listener: " + t.getClass().getName());
+        }
+    }
+    ...
+}
+```
+
+接下来，就是在合适的时机，触发这些Listener。以`ServletContextAttributeListener`为例，统一触发的方法放在`ServletContextImpl`中：
+
+```
+public class ServletContextImpl implements ServletContext {
+    ...
+    void invokeServletContextAttributeAdded(String name, Object value) {
+        logger.info("invoke ServletContextAttributeAdded: {} = {}", name, value);
+        if (this.servletContextAttributeListeners != null) {
+            var event = new ServletContextAttributeEvent(this, name, value);
+            for (var listener : this.servletContextAttributeListeners) {
+                listener.attributeAdded(event);
+            }
+        }
+    }
+
+    void invokeServletContextAttributeRemoved(String name, Object value) {
+        logger.info("invoke ServletContextAttributeRemoved: {} = {}", name, value);
+        if (this.servletContextAttributeListeners != null) {
+            var event = new ServletContextAttributeEvent(this, name, value);
+            for (var listener : this.servletContextAttributeListeners) {
+                listener.attributeRemoved(event);
+            }
+        }
+    }
+
+    void invokeServletContextAttributeReplaced(String name, Object value) {
+        logger.info("invoke ServletContextAttributeReplaced: {} = {}", name, value);
+        if (this.servletContextAttributeListeners != null) {
+            var event = new ServletContextAttributeEvent(this, name, value);
+            for (var listener : this.servletContextAttributeListeners) {
+                listener.attributeReplaced(event);
+            }
+        }
+    }
+    ...
+}
+```
+
+当Web App的任何组件调用`ServletContext`的`setAttribute()`或`removeAttribute()`时，就可以触发事件通知：
+
+```
+public class ServletContextImpl implements ServletContext {
+    ...
+    @Override
+    public void setAttribute(String name, Object value) {
+        if (value == null) {
+            removeAttribute(name);
+        } else {
+            Object old = this.attributes.setAttribute(name, value);
+            if (old == null) {
+                // 触发attributeAdded:
+                this.invokeServletContextAttributeAdded(name, value);
+            } else {
+                // 触发attributeReplaced:
+                this.invokeServletContextAttributeReplaced(name, value);
+            }
+        }
+    }
+
+    @Override
+    public void removeAttribute(String name) {
+        Object old = this.attributes.removeAttribute(name);
+        // 触发attributeRemoved:
+        this.invokeServletContextAttributeRemoved(name, old);
+    }
+    ...
+}
+```
+
+其他事件触发也是类似的写法，此处不再重复。
+
+##### 测试Listener
+
+为了测试Listener机制是否生效，我们还需要先编写不同类型的Listener，例如，`HelloHttpSessionAttributeListener`实现如下：
+
+```
+@WebListener
+public class HelloHelloHttpSessionAttributeListener implements HttpSessionAttributeListener {
+
+    final Logger logger = LoggerFactory.getLogger(getClass());
+
+    @Override
+    public void attributeAdded(HttpSessionBindingEvent event) {
+        logger.info(">>> HttpSession attribute added: {} = {}", event.getName(), event.getValue());
+    }
+
+    @Override
+    public void attributeRemoved(HttpSessionBindingEvent event) {
+        logger.info(">>> HttpSession attribute removed: {} = {}", event.getName(), event.getValue());
+    }
+
+    @Override
+    public void attributeReplaced(HttpSessionBindingEvent event) {
+        logger.info(">>> HttpSession attribute replaced: {} = {}", event.getName(), event.getValue());
+    }
+}
+```
+
+然后在`HttpConnector`中注册所有的Listener：
+
+```
+List<Class<? extends EventListener>> listenerClasses = List.of(HelloHttpSessionAttributeListener.class, ...);
+for (Class<? extends EventListener> listenerClass : listenerClasses) {
+    this.servletContext.addListener(listenerClass);
+}
+```
+
+启动服务器，在浏览器中登录或登出，观察日志输出，在每个请求处理前后，可以看到`ServletRequestListener`的创建和销毁事件：
+
+```
+08:58:23.944 [HTTP-Dispatcher] INFO  c.i.j.e.l.HelloServletRequestListener -- >>> ServletRequest initialized: HttpServletRequestImpl@71a49a97[GET:/]
+...
+08:58:24.008 [HTTP-Dispatcher] INFO  c.i.j.e.l.HelloServletRequestListener -- >>> ServletRequest destroyed: HttpServletRequestImpl@71a49a97[GET:/]
+```
+
+在第一次访问页面和登出时，可以看到`HttpSessionListener`的创建和销毁事件：
+
+```
+08:58:23.947 [HTTP-Dispatcher] INFO  c.i.j.e.l.HelloHttpSessionListener -- >>> HttpSession created: com.itranswarp.jerrymouse.engine.HttpSessionImpl@15037a31
+...
+08:58:36.766 [HTTP-Dispatcher] INFO  c.i.j.e.l.HelloHttpSessionListener -- >>> HttpSession destroyed: com.itranswarp.jerrymouse.engine.HttpSessionImpl@15037a31
+```
+
+其他事件的触发也可以在日志中找到，这说明我们成功地实现了Servlet规范的Listener机制。
+
+##### 小结
+
+Servlet规范定义了各种Listener组件，我们支持了其中常用的大部分`EventListener`组件；
+
+Listener组件由`ServletContext`统一管理，并提供统一调度入口方法；
+
+通知机制允许多线程同时调用，如果要防止并发调用Listener的回调方法，需要Listener组件本身在内部做好同步。
