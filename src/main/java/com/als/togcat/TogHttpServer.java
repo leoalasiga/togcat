@@ -29,10 +29,16 @@ public class TogHttpServer implements HttpHandler,AutoCloseable {
     final String host;
     final int port;
 
+    /**
+     * 定义了一个httpserver，
+     * @param host
+     * @param port
+     * @throws IOException
+     */
     public TogHttpServer(String host, int port) throws IOException {
         this.host = host;
         this.port = port;
-        this.httpServer = HttpServer.create(new InetSocketAddress("0.0.0.0", 8080), 0);
+        this.httpServer = HttpServer.create(new InetSocketAddress("0.0.0.0", port), 0);
         this.httpServer.createContext("/", this);
         this.httpServer.start();
         logger.info("start togcat http server at {}:{}", host, port);
@@ -61,6 +67,11 @@ public class TogHttpServer implements HttpHandler,AutoCloseable {
         this.httpServer.stop(3);
     }
 
+    /**
+     * 可见，HttpExchange封装了HTTP请求和响应，我们不再需要解析原始的HTTP请求，也无需构造原始的HTTP响应，而是通过HttpExchange间接操作，大大简化了HTTP请求的处理。
+     * @param httpExchange
+     * @throws IOException
+     */
     @Override
     public void handle(HttpExchange httpExchange) throws IOException {
         // 获取请求方法、URI、Path、Query等:

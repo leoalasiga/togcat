@@ -31,12 +31,11 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.*;
-import java.util.regex.Pattern;
 
 import static java.util.regex.Pattern.*;
 
 /**
- * TODO
+ * 编写HttpServletRequestImpl，它内部持有HttpServletRequest，并实现了HttpServletRequest接口
  *
  * @author 刘嘉杰
  * @version 1.0.0

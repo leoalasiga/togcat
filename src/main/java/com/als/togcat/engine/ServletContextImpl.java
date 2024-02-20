@@ -76,6 +76,14 @@ public class ServletContextImpl implements ServletContext {
     }
 
     // HTTP请求处理入口:
+
+    /**
+     * 现在，我们已经成功实现了一个HttpConnector，并且，将jdk.httpserver提供的输入输出HttpExchange转换为Servlet标准定义的HttpServletRequest和HttpServletResponse接口，最终处理方法如下：
+     * @param request
+     * @param response
+     * @throws IOException
+     * @throws ServletException
+     */
     public void process(HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException {
         // 请求路径:
         String path = request.getRequestURI();

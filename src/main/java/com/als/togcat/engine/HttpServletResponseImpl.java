@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * TODO
+ * 编写HttpServletResponseImpl，它内部持有HttpServletResponse，并实现了HttpServletResponse接口
  *
  * @author 刘嘉杰
  * @version 1.0.0
